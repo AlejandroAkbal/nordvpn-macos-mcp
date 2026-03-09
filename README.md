@@ -1,6 +1,20 @@
 # nordvpn-mcp
 
-Local stdio MCP server that exposes a thin tool layer around the local NordVPN CLI project at `/Users/lume/Projects/nordvpn-operator`.
+Local stdio MCP server that exposes a thin tool layer around a user-supplied checkout of the NordVPN CLI project.
+
+The intended CLI backend is your fork:
+
+- https://github.com/AlejandroAkbal/nordvpn-macos-cli
+
+## Required startup argument
+
+This MCP requires the NordVPN CLI project root as its first startup argument, or via the `NORDVPN_PROJECT_ROOT` environment variable.
+
+Example:
+
+```bash
+node dist/index.js /Users/lume/Projects/nordvpn-operator
+```
 
 ## Tools
 
@@ -17,7 +31,7 @@ Local stdio MCP server that exposes a thin tool layer around the local NordVPN C
 ```bash
 pnpm install
 pnpm build
-node dist/index.js
+node dist/index.js /Users/lume/Projects/nordvpn-operator
 ```
 
 OpenCode should launch this server through `~/.config/opencode/opencode.json` using stdio.

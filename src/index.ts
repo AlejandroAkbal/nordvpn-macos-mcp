@@ -12,8 +12,6 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
-const PROJECT_ROOT = "/Users/lume/Projects/nordvpn-operator";
-const PYTHON_BIN = "/Users/lume/Projects/nordvpn-operator/.venv/bin/python";
 const AUTH_FILE = join(homedir(), ".nord-auth");
 const HOMEBREW_BIN = "/opt/homebrew/bin";
 const COUNTRY_CODE_PATTERN = /^[A-Za-z]{2}$/;
@@ -30,6 +28,9 @@ const COMMAND_TIMEOUTS_MS: Record<string, number> = {
 };
 
 let statefulToolQueue: Promise<void> = Promise.resolve();
+
+const configuredProjectRoot = normalizeProjectRoot(process.argv[2] ?? process.env.NORDVPN_PROJECT_ROOT);
+const configuredPythonBin = join(configuredProjectRoot, ".venv", "bin", "python");
 
 type ToolArgs = Record<string, unknown>;
 
@@ -188,15 +189,25 @@ function ensureEnvironment(): void {
   }
 }
 
+function normalizeProjectRoot(value: string | undefined): string {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (!normalized) {
+    throw new Error(
+      "NordVPN project root is required. Pass it as the first argument or set NORDVPN_PROJECT_ROOT.",
+    );
+  }
+  return normalized;
+}
+
 function ensureProjectPaths(): void {
-  if (!existsSync(PROJECT_ROOT)) {
-    throw new Error(`NordVPN project root not found: ${PROJECT_ROOT}`);
+  if (!existsSync(configuredProjectRoot)) {
+    throw new Error(`NordVPN project root not found: ${configuredProjectRoot}`);
   }
-  if (!existsSync(PYTHON_BIN)) {
-    throw new Error(`NordVPN Python binary not found: ${PYTHON_BIN}`);
+  if (!existsSync(configuredPythonBin)) {
+    throw new Error(`NordVPN Python binary not found: ${configuredPythonBin}`);
   }
-  if (!existsSync(join(PROJECT_ROOT, "pyproject.toml"))) {
-    throw new Error(`pyproject.toml not found in ${PROJECT_ROOT}`);
+  if (!existsSync(join(configuredProjectRoot, "pyproject.toml"))) {
+    throw new Error(`pyproject.toml not found in ${configuredProjectRoot}`);
   }
 }
 
@@ -305,7 +316,7 @@ async function ensureOpenVpnAvailable(): Promise<void> {
 
   await new Promise<void>((resolve, reject) => {
     const child = spawn("openvpn", ["--version"], {
-      cwd: PROJECT_ROOT,
+      cwd: configuredProjectRoot,
       env: process.env,
       stdio: ["ignore", "ignore", "ignore"],
     });
@@ -395,8 +406,8 @@ async function runCli(toolName: string, command: string[]): Promise<CliResult> {
   await validateEnvironmentForTool(toolName);
 
   return await new Promise((resolve, reject) => {
-    const child = spawn(PYTHON_BIN, command, {
-      cwd: PROJECT_ROOT,
+    const child = spawn(configuredPythonBin, command, {
+      cwd: configuredProjectRoot,
       env: process.env,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -432,7 +443,7 @@ async function runCli(toolName: string, command: string[]): Promise<CliResult> {
       clearTimeout(timeout);
       resolve({
         toolName,
-        command: [PYTHON_BIN, ...command],
+        command: [configuredPythonBin, ...command],
         exitCode: code ?? 1,
         stdout: stdout.trim(),
         stderr: stderr.trim(),

@@ -1,0 +1,27 @@
+{
+  "name": "nordvpn-mcp",
+  "version": "0.1.0",
+  "mcpName": "local/nordvpn-mcp",
+  "description": "Local MCP server for controlling the nordvpn-macos-cli project",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "nordvpn-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}

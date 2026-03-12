@@ -31,7 +31,28 @@ node dist/index.js /Users/lume/Projects/nordvpn-operator
 ```bash
 pnpm install
 pnpm build
+pnpm test
 node dist/index.js /Users/lume/Projects/nordvpn-operator
 ```
 
 OpenCode should launch this server through `~/.config/opencode/opencode.json` using stdio.
+
+## Verification semantics
+
+`vpn_status` parsing now recognizes verification outcomes emitted by the CLI backend:
+
+- `verified`
+- `country_mismatch`
+- `country_unconfirmed`
+- `unavailable` (for explicit server connections without country scope)
+
+`vpn_connect` and `vpn_rotate` follow-up verification (`verifyAfterConnect` / `verifyAfterRotate`) prioritizes these parsed states before falling back to plain observed-country comparison.
+
+## PATH behavior
+
+At startup the server ensures Homebrew binary paths are present in `PATH`:
+
+- `/opt/homebrew/bin`
+- `/opt/homebrew/sbin`
+
+This allows MCP-launched subprocesses to discover `openvpn` when it is installed via Homebrew.

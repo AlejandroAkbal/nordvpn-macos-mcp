@@ -11,9 +11,11 @@ import {
   ListToolsRequestSchema,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
+import { parseStatusOutput, statusCountryCode } from "./status-parser.js";
 
 const AUTH_FILE = join(homedir(), ".nord-auth");
 const HOMEBREW_BIN = "/opt/homebrew/bin";
+const HOMEBREW_SBIN = "/opt/homebrew/sbin";
 const COUNTRY_CODE_PATTERN = /^[A-Za-z]{2}$/;
 const SERVER_PATTERN = /^[a-z]{2}\d{1,4}(?:\.nordvpn\.com)?$/i;
 const STATEFUL_TOOLS = new Set(["vpn_connect", "vpn_disconnect", "vpn_rotate", "vpn_setup"]);
@@ -184,9 +186,17 @@ const TOOLS: Tool[] = [
 ];
 
 function ensureEnvironment(): void {
-  if (!process.env.PATH?.includes(HOMEBREW_BIN)) {
-    process.env.PATH = `${HOMEBREW_BIN}:${process.env.PATH ?? ""}`;
+  const currentPath = process.env.PATH ?? "";
+  const segments = currentPath.split(":").filter((segment) => segment.trim() !== "");
+
+  if (!segments.includes(HOMEBREW_BIN)) {
+    segments.unshift(HOMEBREW_BIN);
   }
+  if (!segments.includes(HOMEBREW_SBIN)) {
+    segments.unshift(HOMEBREW_SBIN);
+  }
+
+  process.env.PATH = segments.join(":");
 }
 
 function normalizeProjectRoot(value: string | undefined): string {
@@ -453,42 +463,6 @@ async function runCli(toolName: string, command: string[]): Promise<CliResult> {
   });
 }
 
-function parseStatusOutput(stdout: string): Record<string, unknown> | undefined {
-  if (!stdout) return undefined;
-
-  const connected = stdout.toLowerCase().includes("vpn: connected")
-    ? true
-    : stdout.toLowerCase().includes("vpn: disconnected")
-      ? false
-      : undefined;
-
-  const firstBrace = stdout.indexOf("{");
-  let ipInfo: Record<string, unknown> | undefined;
-
-  if (firstBrace >= 0) {
-    try {
-      const parsed = JSON.parse(stdout.slice(firstBrace));
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        ipInfo = parsed as Record<string, unknown>;
-      }
-    } catch {
-      ipInfo = undefined;
-    }
-  }
-
-  return { connected, ipInfo };
-}
-
-function statusCountryCode(parsed: Record<string, unknown> | undefined): string | undefined {
-  const ipInfo = parsed?.ipInfo;
-  if (!ipInfo || typeof ipInfo !== "object" || Array.isArray(ipInfo)) {
-    return undefined;
-  }
-
-  const country = (ipInfo as Record<string, unknown>).country;
-  return typeof country === "string" && country.trim() !== "" ? country.toUpperCase() : undefined;
-}
-
 function parseCountriesOutput(stdout: string): Record<string, unknown> | undefined {
   if (!stdout) return undefined;
 
@@ -669,6 +643,10 @@ async function verifyVpnState(options: {
   const parsed = verificationStructured.parsed;
   const connected = parsed?.connected;
   const observedCountry = statusCountryCode(parsed);
+  const verificationState =
+    parsed && typeof parsed.verificationState === "string" ? parsed.verificationState : undefined;
+  const verificationMessage =
+    parsed && typeof parsed.verificationMessage === "string" ? parsed.verificationMessage : undefined;
 
   let success = verificationStructured.success;
   let reason: string | undefined;
@@ -679,6 +657,15 @@ async function verifyVpnState(options: {
   } else if (connected !== true) {
     success = false;
     reason = "verification status did not report an active VPN connection";
+  } else if (verificationState === "country_mismatch") {
+    success = false;
+    reason = verificationMessage ?? "verification reported a country mismatch";
+  } else if (verificationState === "country_unconfirmed") {
+    success = false;
+    reason = verificationMessage ?? "verification could not confirm country consensus";
+  } else if (verificationState === "verified") {
+    success = true;
+    reason = undefined;
   } else if (options.expectedCountry && observedCountry && observedCountry !== options.expectedCountry) {
     success = false;
     reason = `verification country mismatch: expected ${options.expectedCountry}, observed ${observedCountry}`;
